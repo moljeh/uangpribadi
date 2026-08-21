@@ -7,6 +7,36 @@ function formatRupiahFormat(angka) { return new Intl.NumberFormat('id-ID', { sty
 function inputRupiah(input) { let angka = input.value.replace(/[^0-9]/g, ''); input.value = angka.replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 
 // ==========================================
+// ROUTING & TOMBOL KEMBALI (SMART BACK BUTTON)
+// ==========================================
+// Mencegah aplikasi keluar saat tombol kembali ditekan saat popup terbuka
+window.addEventListener('popstate', (e) => {
+  if (document.body.classList.contains('swal2-shown')) { 
+    Swal.close(); 
+    return; 
+  }
+  const hash = location.hash;
+  if (hash === '#riwayat') renderHistory(true);
+  else if (hash === '#pengaturan') renderSettings(true);
+  else renderDashboard(true);
+});
+
+const nativeSwalFire = Swal.fire;
+Swal.fire = function(...args) {
+  if (!document.body.classList.contains('swal2-shown')) {
+    history.pushState({ isPopup: true }, "", location.hash || "#");
+  }
+  return nativeSwalFire.apply(this, args).then((result) => {
+    setTimeout(() => { 
+      if (!document.body.classList.contains('swal2-shown') && history.state && history.state.isPopup) {
+        history.back(); 
+      }
+    }, 150);
+    return result;
+  });
+};
+
+// ==========================================
 // 0. SISTEM LOGIN & INISIALISASI
 // ==========================================
 window.onload = () => {
@@ -50,7 +80,6 @@ async function prosesLogin() {
   }
 }
 
-
 // ==========================================
 // FITUR SHOW/HIDE PASSWORD
 // ==========================================
@@ -60,12 +89,10 @@ function togglePassword() {
   
   if (passInput.type === 'password') {
     passInput.type = 'text';
-    // Ubah ikon menjadi mata dicoret
     ikonMata.classList.remove('fa-eye');
     ikonMata.classList.add('fa-eye-slash');
   } else {
     passInput.type = 'password';
-    // Kembalikan ikon menjadi mata biasa
     ikonMata.classList.remove('fa-eye-slash');
     ikonMata.classList.add('fa-eye');
   }
@@ -80,7 +107,8 @@ function prosesLogout() {
       sessionStorage.removeItem('isLoggedIn');
       document.getElementById('main-app').classList.add('hidden');
       document.getElementById('login-screen').classList.remove('hidden');
-      appData = null; // Bersihkan data memori
+      appData = null; 
+      history.pushState(null, "", window.location.pathname); // Hapus hash riwayat
     }
   });
 }
@@ -103,7 +131,13 @@ async function muatData() {
   try {
     const response = await fetch(API_URL);
     appData = await response.json();
-    renderDashboard();
+    
+    // Tampilkan layar sesuai hash url saat direfresh
+    const hash = location.hash;
+    if (hash === '#riwayat') renderHistory(true);
+    else if (hash === '#pengaturan') renderSettings(true);
+    else renderDashboard(true);
+
   } catch (error) {
     document.getElementById('app-content').innerHTML = `<p class="text-center text-rose-500 mt-10">Gagal terhubung ke database.</p>`;
   }
@@ -118,7 +152,8 @@ function ubahNav(index) {
 // ==========================================
 // 1. DASHBOARD UTAMA
 // ==========================================
-function renderDashboard() {
+function renderDashboard(isBack = false) {
+  if (!isBack) history.pushState({ page: 'dashboard' }, "", "#beranda");
   ubahNav(0);
   if (!appData) return;
 
@@ -197,8 +232,11 @@ async function kirimTransaksi(jenis) {
 // ==========================================
 // 3. RIWAYAT
 // ==========================================
-function renderHistory() {
-  ubahNav(1); if (!appData) return;
+function renderHistory(isBack = false) {
+  if (!isBack) history.pushState({ page: 'riwayat' }, "", "#riwayat");
+  ubahNav(1); 
+  if (!appData) return;
+
   const listTrx = appData.transaksi.map(t => {
     const isMasuk = t.jenis === 'Pemasukan';
     return `<div class="bg-white p-4 rounded-2xl mb-3 border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="hapusTransaksi(${t.row}, '${t.kategori}')"><div><div class="flex items-center gap-2 mb-1"><span class="text-[9px] font-bold px-2 py-0.5 rounded-md ${isMasuk ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${t.jenis.toUpperCase()}</span><h4 class="font-bold text-sm text-slate-700">${t.kategori}</h4></div><p class="text-[11px] text-slate-400"><i class="far fa-calendar-alt"></i> ${new Date(t.tanggal).toLocaleDateString('id-ID')} - ${t.keterangan || '-'}</p></div><div class="font-bold text-sm ${isMasuk ? 'text-emerald-500' : 'text-rose-500'}">${isMasuk ? '+' : '-'} ${formatRupiahFormat(t.nominal).replace('Rp','')}</div></div>`;
@@ -216,19 +254,22 @@ function hapusTransaksi(row, kategori) {
 // 4. PENGATURAN (KATEGORI & RESET)
 // ==========================================
 let kategoriLokal = [];
-function renderSettings() {
-  ubahNav(-1); if (!appData) return;
+function renderSettings(isBack = false) {
+  if (!isBack) history.pushState({ page: 'pengaturan' }, "", "#pengaturan");
+  ubahNav(-1); 
+  if (!appData) return;
+
   if (kategoriLokal.length === 0) {
     appData.kategori.Pemasukan.forEach(k => kategoriLokal.push({jenis: 'Pemasukan', nama: k}));
     appData.kategori.Pengeluaran.forEach(k => kategoriLokal.push({jenis: 'Pengeluaran', nama: k}));
   }
-  const listHtml = kategoriLokal.map((k, i) => `<div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm mb-2"><select onchange="kategoriLokal[${i}].jenis = this.value" class="text-xs font-bold border-none outline-none bg-transparent ${k.jenis==='Pemasukan'?'text-emerald-600':'text-rose-600'}"><option value="Pemasukan" ${k.jenis==='Pemasukan'?'selected':''}>Pemasukan</option><option value="Pengeluaran" ${k.jenis==='Pengeluaran'?'selected':''}>Pengeluaran</option></select><input type="text" value="${k.nama}" onchange="kategoriLokal[${i}].nama = this.value" class="flex-1 text-sm outline-none border-b border-transparent focus:border-primary"><button onclick="kategoriLokal.splice(${i}, 1); renderSettings();" class="text-slate-300 hover:text-rose-500"><i class="fas fa-times"></i></button></div>`).join('');
+  const listHtml = kategoriLokal.map((k, i) => `<div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm mb-2"><select onchange="kategoriLokal[${i}].jenis = this.value" class="text-xs font-bold border-none outline-none bg-transparent ${k.jenis==='Pemasukan'?'text-emerald-600':'text-rose-600'}"><option value="Pemasukan" ${k.jenis==='Pemasukan'?'selected':''}>Pemasukan</option><option value="Pengeluaran" ${k.jenis==='Pengeluaran'?'selected':''}>Pengeluaran</option></select><input type="text" value="${k.nama}" onchange="kategoriLokal[${i}].nama = this.value" class="flex-1 text-sm outline-none border-b border-transparent focus:border-primary"><button onclick="kategoriLokal.splice(${i}, 1); renderSettings(true);" class="text-slate-300 hover:text-rose-500"><i class="fas fa-times"></i></button></div>`).join('');
   
   document.getElementById('app-content').innerHTML = `
     <div class="fade-in pb-10">
       <div class="flex items-center gap-3 mb-6"><button onclick="renderDashboard()" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><i class="fas fa-arrow-left"></i></button><h2 class="text-lg font-bold text-slate-800">Pengaturan Kategori</h2></div>
       <div class="mb-4">${listHtml}</div>
-      <button onclick="kategoriLokal.push({jenis:'Pengeluaran', nama:''}); renderSettings();" class="w-full bg-slate-50 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl mb-4 hover:bg-slate-100 transition border-dashed"><i class="fas fa-plus mr-1"></i> Tambah Kategori</button>
+      <button onclick="kategoriLokal.push({jenis:'Pengeluaran', nama:''}); renderSettings(true);" class="w-full bg-slate-50 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl mb-4 hover:bg-slate-100 transition border-dashed"><i class="fas fa-plus mr-1"></i> Tambah Kategori</button>
       <button onclick="simpanKategori()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-blue-700 transition mb-8">Simpan Perubahan</button>
       <div class="border-t border-slate-200 pt-6 mt-2"><h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Zona Berbahaya</h3><button onclick="resetSemuaData()" class="w-full bg-rose-50 text-rose-600 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition border border-rose-200 shadow-sm"><i class="fas fa-exclamation-triangle mr-1"></i> Reset Ke Pengaturan Awal</button></div>
     </div>`;
@@ -236,12 +277,48 @@ function renderSettings() {
 
 async function simpanKategori() {
   Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'simpan_kategori', data: kategoriLokal }) }); kategoriLokal = []; await muatData(); Swal.fire({ icon: 'success', title: 'Berhasil', showConfirmButton: false, timer: 1000 }); renderSettings(); } 
+  try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'simpan_kategori', data: kategoriLokal }) }); kategoriLokal = []; await muatData(); Swal.fire({ icon: 'success', title: 'Berhasil', showConfirmButton: false, timer: 1000 }); renderSettings(true); } 
   catch(e) { Swal.fire('Error', 'Gagal menyimpan.', 'error'); }
 }
 
 function resetSemuaData() {
   Swal.fire({ title: 'Reset Semua Data?', html: 'Seluruh riwayat akan dihapus.<br><span class="text-rose-500 font-bold">Data tidak dapat dikembalikan!</span>', icon: 'warning', showCancelButton: true, confirmButtonColor: '#e11d48', confirmButtonText: 'Ya, Reset Total' }).then(async (r) => {
-    if (r.isConfirmed) { Swal.fire({ title: 'Mereset...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'reset_semua' }) }); kategoriLokal = []; await muatData(); Swal.fire('Berhasil!', 'Data direset', 'success'); renderSettings(); } catch (e) { Swal.fire('Error', 'Gagal mereset.', 'error'); } }
+    if (r.isConfirmed) { Swal.fire({ title: 'Mereset...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'reset_semua' }) }); kategoriLokal = []; await muatData(); Swal.fire('Berhasil!', 'Data direset', 'success'); renderSettings(true); } catch (e) { Swal.fire('Error', 'Gagal mereset.', 'error'); } }
   });
 }
+
+// ==========================================
+// PWA: NOTIFIKASI INSTALL APLIKASI
+// ==========================================
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const installBanner = document.getElementById('install-banner');
+  if (installBanner && !localStorage.getItem('pwa_ditolak')) {
+    installBanner.classList.remove('hidden');
+    setTimeout(() => { 
+      installBanner.classList.remove('-translate-y-20', 'opacity-0'); 
+      installBanner.classList.add('translate-y-0', 'opacity-100'); 
+    }, 100);
+  }
+});
+
+document.getElementById('btn-install')?.addEventListener('click', async () => {
+  const installBanner = document.getElementById('install-banner');
+  installBanner.classList.add('-translate-y-20', 'opacity-0');
+  setTimeout(() => installBanner.classList.add('hidden'), 500);
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null; 
+  }
+});
+
+document.getElementById('btn-tutup-install')?.addEventListener('click', () => {
+  const installBanner = document.getElementById('install-banner');
+  installBanner.classList.add('-translate-y-20', 'opacity-0');
+  setTimeout(() => installBanner.classList.add('hidden'), 500);
+  localStorage.setItem('pwa_ditolak', 'true');
+});
