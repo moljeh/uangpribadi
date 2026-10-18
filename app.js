@@ -1,5 +1,5 @@
 // ====== GANTI DENGAN URL WEB APP BARU ANDA ======
-const API_URL = 'https://script.google.com/macros/s/AKfycbzlrlkq4whXcjTQ2DCrqvQV0jeeY31P2cJKxZz1TKl5V-pqBztTQan3p0d-G_VRgyTP/exec'; 
+const API_URL = 'https://script.google.com/macros/s/AKfycbw6jqDGOQmWuUg2nw9SckSKc7wt4GsPPHLK5hLxL28omCPM1kt-olD-8BsDoUUVI_iV/exec'; 
 let appData = null;
 
 // Format Rupiah
@@ -161,7 +161,7 @@ function renderDashboard(isBack = false) {
     const isMasuk = t.jenis === 'Pemasukan';
     const color = isMasuk ? 'text-emerald-500' : 'text-rose-500';
     return `
-      <div class="flex justify-between items-center p-4 bg-light rounded-2xl mb-3 border border-slate-100">
+      <div class="flex justify-between items-center p-4 bg-light rounded-2xl mb-3 border border-slate-100 cursor-pointer hover:bg-slate-50 transition" onclick="bukaOpsiTransaksi(${t.row}, '${t.tanggal}', '${t.jenis}', '${t.kategori}', ${t.nominal}, '${t.keterangan || ''}')">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-full ${isMasuk ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'} flex items-center justify-center text-sm">
             <i class="fas ${isMasuk ? 'fa-arrow-down' : 'fa-arrow-up'}"></i>
@@ -226,11 +226,11 @@ function bukaForm(jenis) {
 async function kirimTransaksi(jenis) {
   const payload = { action: 'tambah_transaksi', data: { tanggal: document.getElementById('t-tanggal').value, jenis: jenis, kategori: document.getElementById('t-kategori').value, nominal: Number(document.getElementById('t-nominal').value.replace(/\./g, '')), keterangan: document.getElementById('t-ket').value } };
   Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  try { await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); await muatData(); Swal.close(); } catch(e) { Swal.fire('Error', 'Gagal menyimpan.', 'error'); }
+  try { await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); await muatData(); Swal.close(); renderDashboard(true); } catch(e) { Swal.fire('Error', 'Gagal menyimpan.', 'error'); }
 }
 
 // ==========================================
-// 3. RIWAYAT
+// 3. RIWAYAT & EDIT TRANSAKSI
 // ==========================================
 function renderHistory(isBack = false) {
   if (!isBack) history.pushState({ page: 'riwayat' }, "", "#riwayat");
@@ -239,14 +239,95 @@ function renderHistory(isBack = false) {
 
   const listTrx = appData.transaksi.map(t => {
     const isMasuk = t.jenis === 'Pemasukan';
-    return `<div class="bg-white p-4 rounded-2xl mb-3 border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="hapusTransaksi(${t.row}, '${t.kategori}')"><div><div class="flex items-center gap-2 mb-1"><span class="text-[9px] font-bold px-2 py-0.5 rounded-md ${isMasuk ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${t.jenis.toUpperCase()}</span><h4 class="font-bold text-sm text-slate-700">${t.kategori}</h4></div><p class="text-[11px] text-slate-400"><i class="far fa-calendar-alt"></i> ${new Date(t.tanggal).toLocaleDateString('id-ID')} - ${t.keterangan || '-'}</p></div><div class="font-bold text-sm ${isMasuk ? 'text-emerald-500' : 'text-rose-500'}">${isMasuk ? '+' : '-'} ${formatRupiahFormat(t.nominal).replace('Rp','')}</div></div>`;
+    return `<div class="bg-white p-4 rounded-2xl mb-3 border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:bg-slate-50 transition" onclick="bukaOpsiTransaksi(${t.row}, '${t.tanggal}', '${t.jenis}', '${t.kategori}', ${t.nominal}, '${t.keterangan || ''}')"><div><div class="flex items-center gap-2 mb-1"><span class="text-[9px] font-bold px-2 py-0.5 rounded-md ${isMasuk ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${t.jenis.toUpperCase()}</span><h4 class="font-bold text-sm text-slate-700">${t.kategori}</h4></div><p class="text-[11px] text-slate-400"><i class="far fa-calendar-alt"></i> ${new Date(t.tanggal).toLocaleDateString('id-ID')} - ${t.keterangan || '-'}</p></div><div class="font-bold text-sm ${isMasuk ? 'text-emerald-500' : 'text-rose-500'}">${isMasuk ? '+' : '-'} ${formatRupiahFormat(t.nominal).replace('Rp','')}</div></div>`;
   }).join('');
-  document.getElementById('app-content').innerHTML = `<div class="fade-in pb-10"><h2 class="text-lg font-bold text-slate-800 mb-4">Riwayat Transaksi</h2><p class="text-xs text-slate-400 mb-4">* Ketuk transaksi untuk menghapus</p>${listTrx.length > 0 ? listTrx : '<div class="text-center py-10 text-slate-400">Belum ada riwayat</div>'}</div>`;
+  
+  document.getElementById('app-content').innerHTML = `
+    <div class="fade-in pb-10">
+      <h2 class="text-lg font-bold text-slate-800 mb-4">Riwayat Transaksi</h2>
+      <p class="text-xs text-slate-400 mb-4">* Ketuk transaksi untuk Edit / Hapus</p>
+      ${listTrx.length > 0 ? listTrx : '<div class="text-center py-10 text-slate-400">Belum ada riwayat</div>'}
+    </div>`;
+}
+
+function bukaOpsiTransaksi(row, tanggal, jenis, kategori, nominal, keterangan) {
+  Swal.fire({
+    title: '<span class="text-lg font-bold">Opsi Transaksi</span>',
+    html: `
+      <div class="grid grid-cols-2 gap-3 mt-4">
+        <div onclick="bukaFormEdit(${row}, '${tanggal}', '${jenis}', '${kategori}', ${nominal}, '${keterangan}')" class="bg-blue-50 border border-blue-100 p-4 rounded-2xl cursor-pointer hover:bg-blue-100 flex flex-col items-center gap-2"><div class="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center text-xl shadow-md"><i class="fas fa-edit"></i></div><p class="text-xs font-bold text-blue-800 text-center mt-1">Edit</p></div>
+        <div onclick="hapusTransaksi(${row}, '${kategori}')" class="bg-rose-50 border border-rose-100 p-4 rounded-2xl cursor-pointer hover:bg-rose-100 flex flex-col items-center gap-2"><div class="w-12 h-12 bg-rose-500 text-white rounded-full flex items-center justify-center text-xl shadow-md"><i class="fas fa-trash"></i></div><p class="text-xs font-bold text-rose-800 text-center mt-1">Hapus</p></div>
+      </div>`,
+    showConfirmButton: false, showCloseButton: true, position: 'bottom', customClass: { popup: 'rounded-t-3xl pb-6' }
+  });
+}
+
+function bukaFormEdit(row, tglAwal, jenis, kategoriAwal, nominalAwal, ketAwal) {
+  Swal.close();
+  setTimeout(() => {
+    let opsiKategori = appData.kategori[jenis].map(k => `<option value="${k}" ${k === kategoriAwal ? 'selected' : ''}>${k}</option>`).join('');
+    
+    let dateObj = new Date(tglAwal);
+    dateObj.setMinutes(dateObj.getMinutes() - dateObj.getTimezoneOffset());
+    let formattedDate = dateObj.toISOString().split('T')[0];
+
+    let ketClean = (ketAwal === 'undefined' || ketAwal === 'null' || ketAwal === '-') ? '' : ketAwal;
+
+    Swal.fire({
+      width: '100%', title: `<h3 class="text-lg font-extrabold text-slate-800">Edit ${jenis}</h3>`,
+      html: `
+        <div class="text-left mt-4">
+          <label class="block text-[11px] font-bold mb-1.5 text-slate-500 uppercase">Tanggal</label><input type="date" id="e-tanggal" value="${formattedDate}" class="w-full border border-slate-200 rounded-xl p-3 mb-4 bg-light outline-none">
+          <label class="block text-[11px] font-bold mb-1.5 text-slate-500 uppercase">Kategori</label><select id="e-kategori" class="w-full border border-slate-200 rounded-xl p-3 mb-4 bg-light outline-none">${opsiKategori || '<option value="Lainnya">Lainnya</option>'}</select>
+          <label class="block text-[11px] font-bold mb-1.5 text-slate-500 uppercase">Nominal</label><div class="relative mb-4"><span class="absolute left-4 top-3 text-slate-500 font-bold">Rp</span><input type="text" id="e-nominal" value="${formatRupiahFormat(nominalAwal).replace('Rp', '').replace(/,00/g, '').trim()}" class="w-full border border-slate-200 rounded-xl p-3 pl-10 text-base font-bold outline-none" placeholder="0" oninput="inputRupiah(this)"></div>
+          <label class="block text-[11px] font-bold mb-1.5 text-slate-500 uppercase">Keterangan (Opsional)</label><textarea id="e-ket" class="w-full border border-slate-200 rounded-xl p-3 bg-light outline-none" rows="2" placeholder="Catatan...">${ketClean}</textarea>
+        </div>`,
+      showCancelButton: true, confirmButtonText: 'Simpan Perubahan', cancelButtonText: 'Batal',
+      customClass: { popup: 'rounded-[32px] absolute bottom-0 m-0 w-full max-w-[480px]', confirmButton: `bg-blue-600 text-white font-bold py-3 px-4 rounded-xl w-full`, cancelButton: 'bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl w-full', actions: 'flex gap-3 w-full px-5 pb-5 mt-4' },
+      preConfirm: () => { if (!document.getElementById('e-nominal').value) { Swal.showValidationMessage('Masukkan nominal!'); return false; } }
+    }).then((r) => { if (r.isConfirmed) kirimEditTransaksi(row, jenis); });
+  }, 200);
+}
+
+async function kirimEditTransaksi(row, jenis) {
+  const nominalVal = document.getElementById('e-nominal').value.replace(/\./g, '');
+  const payload = { 
+    action: 'edit_transaksi', 
+    data: { 
+      row: row,
+      tanggal: document.getElementById('e-tanggal').value, 
+      jenis: jenis, 
+      kategori: document.getElementById('e-kategori').value, 
+      nominal: Number(nominalVal), 
+      keterangan: document.getElementById('e-ket').value 
+    } 
+  };
+  
+  Swal.fire({ title: 'Menyimpan Perubahan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  try { 
+    await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); 
+    await muatData(); 
+    Swal.close(); 
+    
+    // Kembali ke layar yang sedang aktif (bisa Beranda atau Riwayat)
+    if(location.hash === '#beranda' || location.hash === '') renderDashboard(true);
+    else renderHistory(true);
+
+  } catch(e) { 
+    Swal.fire('Error', 'Gagal menyimpan perubahan.', 'error'); 
+  }
 }
 
 function hapusTransaksi(row, kategori) {
   Swal.fire({ title: 'Hapus Transaksi?', text: `Hapus catatan [${kategori}]?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#e11d48', confirmButtonText: 'Ya, Hapus' }).then(async (r) => {
-    if (r.isConfirmed) { Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'hapus_transaksi', data: { row: row } }) }); await muatData(); renderHistory(); Swal.close(); }
+    if (r.isConfirmed) { 
+      Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); 
+      await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'hapus_transaksi', data: { row: row } }) }); 
+      await muatData(); 
+      Swal.close();
+      if(location.hash === '#beranda' || location.hash === '') renderDashboard(true);
+      else renderHistory(true);
+    }
   });
 }
 
@@ -263,15 +344,49 @@ function renderSettings(isBack = false) {
     appData.kategori.Pemasukan.forEach(k => kategoriLokal.push({jenis: 'Pemasukan', nama: k}));
     appData.kategori.Pengeluaran.forEach(k => kategoriLokal.push({jenis: 'Pengeluaran', nama: k}));
   }
-  const listHtml = kategoriLokal.map((k, i) => `<div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm mb-2"><select onchange="kategoriLokal[${i}].jenis = this.value" class="text-xs font-bold border-none outline-none bg-transparent ${k.jenis==='Pemasukan'?'text-emerald-600':'text-rose-600'}"><option value="Pemasukan" ${k.jenis==='Pemasukan'?'selected':''}>Pemasukan</option><option value="Pengeluaran" ${k.jenis==='Pengeluaran'?'selected':''}>Pengeluaran</option></select><input type="text" value="${k.nama}" onchange="kategoriLokal[${i}].nama = this.value" class="flex-1 text-sm outline-none border-b border-transparent focus:border-primary"><button onclick="kategoriLokal.splice(${i}, 1); renderSettings(true);" class="text-slate-300 hover:text-rose-500"><i class="fas fa-times"></i></button></div>`).join('');
   
+  // SOLUSI: 
+  // onchange sekarang hanya mengubah warna pada elemen select itu sendiri (this.className = ...)
+  // tanpa perlu memanggil renderSettings(true) yang menyebabkan layar berkedip.
+  const listHtml = kategoriLokal.map((k, i) => `
+    <div class="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm mb-2">
+      <select onchange="kategoriLokal[${i}].jenis = this.value; this.className = 'text-xs font-bold border-none outline-none bg-transparent ' + (this.value === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600');" class="text-xs font-bold border-none outline-none bg-transparent ${k.jenis === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600'}">
+        <option value="Pemasukan" ${k.jenis === 'Pemasukan' ? 'selected' : ''} class="text-emerald-600">Pemasukan</option>
+        <option value="Pengeluaran" ${k.jenis === 'Pengeluaran' ? 'selected' : ''} class="text-rose-600">Pengeluaran</option>
+      </select>
+      <input type="text" value="${k.nama}" oninput="kategoriLokal[${i}].nama = this.value" placeholder="Nama kategori..." class="flex-1 text-sm outline-none border-b border-transparent focus:border-primary">
+      <button onclick="kategoriLokal.splice(${i}, 1); renderSettings(true);" class="text-slate-300 hover:text-rose-500">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `).join('');
+  
+  // SOLUSI:
+  // Class 'fade-in' hanya diterapkan jika isBack bernilai false (saat menu pertama kali dibuka dari bawah). 
+  // Jika ditambah/dihapus (isBack bernilai true), animasi dimatikan agar tidak berkedip.
   document.getElementById('app-content').innerHTML = `
-    <div class="fade-in pb-10">
-      <div class="flex items-center gap-3 mb-6"><button onclick="renderDashboard()" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><i class="fas fa-arrow-left"></i></button><h2 class="text-lg font-bold text-slate-800">Pengaturan Kategori</h2></div>
+    <div class="${isBack ? '' : 'fade-in'} pb-10">
+      <div class="flex items-center gap-3 mb-6">
+        <button onclick="renderDashboard()" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><i class="fas fa-arrow-left"></i></button>
+        <h2 class="text-lg font-bold text-slate-800">Pengaturan Kategori</h2>
+      </div>
+      
       <div class="mb-4">${listHtml}</div>
-      <button onclick="kategoriLokal.push({jenis:'Pengeluaran', nama:''}); renderSettings(true);" class="w-full bg-slate-50 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl mb-4 hover:bg-slate-100 transition border-dashed"><i class="fas fa-plus mr-1"></i> Tambah Kategori</button>
-      <button onclick="simpanKategori()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-blue-700 transition mb-8">Simpan Perubahan</button>
-      <div class="border-t border-slate-200 pt-6 mt-2"><h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Zona Berbahaya</h3><button onclick="resetSemuaData()" class="w-full bg-rose-50 text-rose-600 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition border border-rose-200 shadow-sm"><i class="fas fa-exclamation-triangle mr-1"></i> Reset Ke Pengaturan Awal</button></div>
+      
+      <button onclick="kategoriLokal.push({jenis:'Pemasukan', nama:''}); renderSettings(true);" class="w-full bg-slate-50 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl mb-4 hover:bg-slate-100 transition border-dashed">
+        <i class="fas fa-plus mr-1"></i> Tambah Kategori
+      </button>
+      
+      <button onclick="simpanKategori()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-blue-700 transition mb-8">
+        Simpan Perubahan
+      </button>
+      
+      <div class="border-t border-slate-200 pt-6 mt-2">
+        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Zona Berbahaya</h3>
+        <button onclick="resetSemuaData()" class="w-full bg-rose-50 text-rose-600 font-bold py-3.5 rounded-xl hover:bg-rose-100 transition border border-rose-200 shadow-sm">
+          <i class="fas fa-exclamation-triangle mr-1"></i> Reset Ke Pengaturan Awal
+        </button>
+      </div>
     </div>`;
 }
 
